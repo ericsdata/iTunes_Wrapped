@@ -148,14 +148,13 @@ class DBM():
         finally:
             conn.close()
             
-    def play_differentials(self,start_lib, end_lib, initializeByDateAdd = False, initalizeAddedSongs = True):
+    def play_differentials(self,start_lib, end_lib):
         """Function execute SQL script to calculate the number of plays, skips, and days between two library dates
 
         Args:
-            start_lib (_type_): _description_
-            end_lib (_type_): _description_
-            initializeByDateAdd (bool, optional): _description_. Defaults to False.
-            initalizeAddedSongs (bool, optional): _description_. Defaults to True.
+            start_lib (_type_): To date from which to do differential calculation
+            end_lib (_type_): From date from which to do differential calc
+
         """    
         ## Calculation is done via SQL Script
         sql_loc = os.path.join(self.sqls,'cal_playdiffs.sql')
@@ -167,63 +166,10 @@ class DBM():
         self.cur.execute(sql_script% (start_lib,end_lib,start_lib))
         ## Fetch results 
         res = self.cur.fetchall()
-        
-        if initializeByDateAdd == True:            
-            #if initailize track on date added
-            #add record with 0 days, 0 skips, 0 plays for songs added 
-            
-            # Select ids that were added between start and end libraries
-            stat2 = '''SELECT persistent_id,
-                            date_added_simple
-                        FROM metaMusic
-                        WHERE date_added_simple > ? AND date_added_simple <= ?;'''
-                        
-            self.cur.execute(stat2, (start_lib,end_lib))
-            
-            res2 = self.cur.fetchall()
-            res2_list = []
-        
-            for item in res2:
-                try:
-                    res2_list.append((item[0],item[1], item[1], 0, 0,0))
-                except: 
-                    pass
-                
-            returnable = res + res2_list
-            
-        else:
-            returnable = res
-            
-            
-        if initalizeAddedSongs == True:
-             #if initailize track on date added
-            #add record with 0 days, 0 skips, 0 plays
-            
-            # Select ids that were added between start and end libraries
-            stat2 = '''SELECT persistent_id,
-                            ?
-                        FROM metaMusic
-                        WHERE date_added_simple > ? AND date_added_simple < ?;'''
-                        
-            self.cur.execute(stat2, (start_lib,start_lib,end_lib))
-            
-            res2 = self.cur.fetchall()
-            res2_list = []
-        
-            for item in res2:
-                try:
-                    res2_list.append((item[0],item[1], item[1], 0, 0,0))
-                except: 
-                    pass
-                
-            returnable = res + res2_list
-            
-        else:
-            returnable = res
-            
+       
             
         
-        return(returnable)
+        return(res)
             
             
     def createPlayDifferential(self, library_dates, new = True):
@@ -311,22 +257,13 @@ class DBM():
             
         finally:
             print("Differentials Loaded")
-            conn.close()
+ 
             
     def QueryToCSV(self, statement, output, returnRaw = False):
         import pandas as pd
-        
-        try:
-            conn = db_ec.connect_db(self.targetDB)
     
-            statDF = pd.read_sql_query(statement, conn)
-            
-        except:
-            print("Error in Query")
-            
-        finally:
-            conn.close()
-        
+    
+        statDF = pd.read_sql_query(statement, self.conn)
         statDF.to_csv(output, index=False)
             
         if returnRaw == True:
