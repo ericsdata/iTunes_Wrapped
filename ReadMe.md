@@ -1,10 +1,10 @@
-### Intro
+## Intro
 
 This was one of my earliest data projects that has taken many lives. Originally written in base R when I started my analytics journey in 2017, I revisited and revised in 2020 to use Python for data processing, and to push the data into a relational database (SQLite), which made analysis much faster. 
 
 Loaded into the relational databse, my iTunes listening habits are much more accessible, allowing simple SQL queries to answer complex data questions, like what were my favorite artists of the year or seasonal trends to songs on particular albums. 
 
-### The Project
+## The Project
 
 As one of the standouts who still maintains a digital music library (and accompa·nying, fully-functional iPod Classic), the Spotify Wrapped that is released each year lacks the full picture of my musical tastes.
 
@@ -36,7 +36,7 @@ The file `DBM.py` handles the connection to the database, including the creation
 The file `Library.py` handles process of raw XML data into data to feed into the new relational databases. 
 
 
-## Play with it
+### Play with it
 
 The `WORKER.py` file shows a possible workflow for cleansing and loading the iTunes data. 
 
