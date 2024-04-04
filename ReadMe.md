@@ -33,4 +33,11 @@ The file `DBM.py` handles the connection to the database, including the creation
 
 #### Data Cleansing and Loading
 
-The file `Library.py` handles read-in of raw XML data into 
+The file `Library.py` handles process of raw XML data into data to feed into the new relational databases. 
+
+
+## Play with it
+
+The `WORKER.py` file shows a possible workflow for cleansing and loading the iTunes data. 
+
+SQL Scripts or Exploratory data analysis with R would be opportunities to start exploring this data.
