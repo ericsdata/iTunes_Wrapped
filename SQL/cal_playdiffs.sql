@@ -5,7 +5,7 @@ SELECT EndID
             END Startlib
         ,  EndLib
         , Cast ((JulianDay(EndLib) - JulianDay(StartLib)) As Integer) as Days 
-        ,CASE WHEN StartPlays IS NULL THEN EndPlays 
+        ,CASE WHEN StartPlays IS NULL THEN EndPlays /*Songs that are added mid-period*/
                 ELSE EndPlays - StartPlays 
                 END Plays
         ,CASE WHEN StartSkips IS NULL THEN  EndSkips
