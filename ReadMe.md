@@ -38,6 +38,55 @@ The file `Library.py` handles process of raw XML data into data to feed into the
 
 ### Play with it
 
-The `WORKER.py` file shows a possible workflow for cleansing and loading the iTunes data. 
+#### Interactive Streamlit App (NEW! 🎉)
 
-SQL Scripts or Exploratory data analysis with R would be opportunities to start exploring this data.
+A new interactive web app has been built using **Streamlit** for exploring your iTunes data:
+
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the app
+streamlit run app.py
+```
+
+The app includes the following features:
+
+- **Overview Dashboard**: View key statistics about your library (total songs, artists, play counts)
+- **Play Count Analysis**: Explore cumulative plays, distribution, and most active listening periods
+- **Library Growth**: Track how your music collection has grown over time, with monthly additions and artist growth
+- **Seasonal Trends**: Analyze listening patterns by month and season, including year-over-year comparisons
+- **Artist Analysis**: Deep dive into individual artists' play history and compare top artists over time
+- **Data Management**: View database statistics, run consistency checks, and identify potential duplicate artist names
+
+#### Features
+
+- **Interactive Visualizations**: All charts are built with Plotly for interactive exploration
+- **Data Cleaning**: Automatic cleaning with option to standardize artist/track names
+- **Consistency Checking**: Identify data issues like orphaned records, missing metadata, etc.
+- **Time-based Filtering**: Analyze data within custom date ranges
+- **Performance**: Results are cached for fast interactions
+
+#### Environment Variables
+
+You can optionally set the database path via environment variable:
+
+```bash
+set ITUNES_DB_PATH=path\to\iTunes.db
+streamlit run app.py
+```
+
+If not set, defaults to `iTunes.db` in the project root.
+
+#### Data Pipeline
+
+The existing Python infrastructure (`WORKER.py`, `Library.py`, `DBM.py`) remains unchanged:
+
+1. Export XML data from iTunes
+2. Run `WORKER.py` to load data into SQLite database
+3. Launch the Streamlit app to explore
+
+The `modules/` folder contains reusable Python functions for:
+- **data_loader.py**: Database connections and data loading
+- **visualizations.py**: Plotly chart generation
+- **data_cleaning.py**: Data standardization and consistency checking
