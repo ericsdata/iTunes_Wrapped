@@ -185,7 +185,8 @@ def calculate_play_differential(activity: pd.DataFrame) -> pd.DataFrame:
 def get_top_tracks(
     activity: pd.DataFrame,
     metadata: pd.DataFrame,
-    n: int = 25
+    n: int = 25,
+    as_of_date: Optional[str] = None
 ) -> pd.DataFrame:
     """
     Get the most played tracks based on activity data.
@@ -194,16 +195,24 @@ def get_top_tracks(
         activity: Activity dataframe
         metadata: Metadata dataframe
         n: Number of top tracks to return
+        as_of_date: Optional date string (YYYY-MM-DD) to show state as of that date
         
     Returns:
         DataFrame with top tracks and their statistics
     """
+    df = activity.copy()
+    
+    # Filter to as_of_date if provided
+    if as_of_date:
+        as_of_dt = pd.to_datetime(as_of_date)
+        df = df[df['library_date'] <= as_of_dt]
+    
     top = (
-        activity
+        df
         .groupby('persistent_id')
         .agg({
-            'play_count': 'sum',
-            'skip_count': 'sum',
+            'play_count': 'max',  # Take the most recent cumulative value (as-of snapshot)
+            'skip_count': 'max',  # Take the most recent cumulative value (as-of snapshot)
             'library_date': ['min', 'max', 'count']
         })
         .reset_index()
@@ -224,7 +233,8 @@ def get_top_tracks(
 def get_top_artists(
     activity: pd.DataFrame,
     metadata: pd.DataFrame,
-    n: int = 25
+    n: int = 25,
+    as_of_date: Optional[str] = None
 ) -> pd.DataFrame:
     """
     Get the most played artists based on activity data.
@@ -233,23 +243,38 @@ def get_top_artists(
         activity: Activity dataframe
         metadata: Metadata dataframe
         n: Number of top artists to return
+        as_of_date: Optional date string (YYYY-MM-DD) to show state as of that date
         
     Returns:
         DataFrame with top artists and their statistics
     """
+    df = activity.copy()
+    
+    # Filter to as_of_date if provided
+    if as_of_date:
+        as_of_dt = pd.to_datetime(as_of_date)
+        df = df[df['library_date'] <= as_of_dt]
+    
     # Merge activity with artist info
-    combined = activity.merge(
+    combined = df.merge(
         metadata[['persistent_id', 'artist']],
         on='persistent_id',
         how='left'
     )
     
+    # For each artist, sum the max plays of all their tracks (as-of snapshot)
     top = (
         combined
+        .groupby(['artist', 'persistent_id'])
+        .agg({
+            'play_count': 'max',  # Max cumulative plays per track
+            'skip_count': 'max'   # Max cumulative skips per track
+        })
+        .reset_index()
         .groupby('artist')
         .agg({
-            'play_count': 'sum',
-            'skip_count': 'sum',
+            'play_count': 'sum',      # Sum of all tracks' max plays for the artist
+            'skip_count': 'sum',      # Sum of all tracks' max skips for the artist
             'persistent_id': 'nunique'
         })
         .reset_index()
@@ -262,17 +287,19 @@ def get_top_artists(
 
 def get_library_stats_by_date(
     activity: pd.DataFrame,
-    metadata: pd.DataFrame
+    metadata: pd.DataFrame,
+    use_differentials: bool = True
 ) -> pd.DataFrame:
     """
     Calculate aggregate statistics for each library snapshot.
     
     Args:
-        activity: Activity dataframe
+        activity: Activity dataframe (must be sorted by persistent_id, library_date)
         metadata: Metadata dataframe
+        use_differentials: If True, shows plays added since last snapshot. If False, shows cumulative totals as-of date.
         
     Returns:
-        DataFrame with daily statistics
+        DataFrame with statistics per library snapshot
     """
     combined = activity.merge(
         metadata[['persistent_id', 'artist']],
@@ -280,19 +307,39 @@ def get_library_stats_by_date(
         how='left'
     )
     
-    stats = (
-        combined
-        .groupby('library_date')
-        .agg({
-            'play_count': 'sum',
-            'skip_count': 'sum',
-            'persistent_id': 'nunique',
-            'artist': 'nunique'
-        })
-        .reset_index()
-    )
-    
-    stats.columns = ['library_date', 'total_plays', 'total_skips', 'n_songs_played', 'n_artists']
+    if use_differentials:
+        # Calculate plays added since previous snapshot (differential)
+        combined['play_differential'] = combined.groupby('persistent_id')['play_count'].diff().fillna(0).clip(lower=0)
+        combined['skip_differential'] = combined.groupby('persistent_id')['skip_count'].diff().fillna(0).clip(lower=0)
+        
+        stats = (
+            combined
+            .groupby('library_date')
+            .agg({
+                'play_differential': 'sum',  # Total plays added since last snapshot
+                'skip_differential': 'sum',  # Total skips added since last snapshot
+                'persistent_id': 'nunique',
+                'artist': 'nunique'
+            })
+            .reset_index()
+        )
+        
+        stats.columns = ['library_date', 'total_plays', 'total_skips', 'n_songs_played', 'n_artists']
+    else:
+        # Show cumulative totals as of each snapshot date
+        stats = (
+            combined
+            .groupby('library_date')
+            .agg({
+                'play_count': 'sum',   # Sum of all tracks' cumulative plays as of this date
+                'skip_count': 'sum',   # Sum of all tracks' cumulative skips as of this date
+                'persistent_id': 'nunique',
+                'artist': 'nunique'
+            })
+            .reset_index()
+        )
+        
+        stats.columns = ['library_date', 'total_plays', 'total_skips', 'n_songs_played', 'n_artists']
     
     # Calculate averages
     stats['avg_plays_per_song'] = (stats['total_plays'] / stats['n_songs_played']).fillna(0)

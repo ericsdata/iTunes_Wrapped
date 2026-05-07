@@ -99,6 +99,30 @@ if st.sidebar.button("🔄 Refresh Data", use_container_width=True):
     st.rerun()
 
 st.sidebar.markdown("---")
+st.sidebar.subheader("📅 Date Filtering")
+
+# Load data to get date range
+metadata_temp, activity_temp = load_data(DB_PATH, apply_cleaning)
+if not activity_temp.empty:
+    min_date = activity_temp['library_date'].min()
+    max_date = activity_temp['library_date'].max()
+else:
+    min_date = datetime.now()
+    max_date = datetime.now()
+
+# As-of date filter
+use_date_filter = st.sidebar.checkbox("Filter to specific date?", value=False)
+as_of_date = None
+if use_date_filter:
+    as_of_date = st.sidebar.date_input(
+        "Show data as of:",
+        value=max_date,
+        min_value=min_date,
+        max_value=max_date
+    )
+    as_of_date = as_of_date.isoformat() if as_of_date else None
+
+st.sidebar.markdown("---")
 
 # Navigation
 st.sidebar.markdown("### Navigation")
@@ -137,7 +161,11 @@ try:
             st.metric("Total Artists", f"{metadata['artist'].nunique():,}")
         
         with col3:
-            total_plays = activity['play_count'].sum()
+            # Total plays: get latest as-of values for all tracks and sum
+            if not activity.empty:
+                total_plays = activity.groupby('persistent_id')['play_count'].max().sum()
+            else:
+                total_plays = 0
             st.metric("Total Plays", f"{total_plays:,}")
         
         with col4:
@@ -152,14 +180,14 @@ try:
         
         with col1:
             st.subheader("🏆 Top 10 Most Played Songs")
-            top_songs = get_top_tracks(activity, metadata, n=10)
+            top_songs = get_top_tracks(activity, metadata, n=10, as_of_date=as_of_date)
             display_songs = top_songs[['title', 'artist', 'total_plays']].copy()
             display_songs.columns = ['Title', 'Artist', 'Plays']
             st.dataframe(display_songs, use_container_width=True, hide_index=True)
         
         with col2:
             st.subheader("👥 Top 10 Artists")
-            top_artists_df = get_top_artists(activity, metadata, n=10)
+            top_artists_df = get_top_artists(activity, metadata, n=10, as_of_date=as_of_date)
             display_artists = top_artists_df[['artist', 'total_plays', 'n_songs']].copy()
             display_artists.columns = ['Artist', 'Plays', 'Songs']
             st.dataframe(display_artists, use_container_width=True, hide_index=True)
@@ -194,30 +222,31 @@ try:
         
         with col2:
             st.subheader("📈 Statistics")
-            play_counts = activity['play_count']
+            # For statistics, use the latest (max) play count per track
+            latest_plays = activity.groupby('persistent_id')['play_count'].max()
             stats_data = {
                 'Metric': [
                     'Total Plays', 'Average per Song', 'Median Plays',
                     'Max Plays', 'Min Plays', 'Std Deviation'
                 ],
                 'Value': [
-                    f"{play_counts.sum():,}",
-                    f"{play_counts.mean():.2f}",
-                    f"{play_counts.median():.0f}",
-                    f"{play_counts.max():.0f}",
-                    f"{play_counts.min():.0f}",
-                    f"{play_counts.std():.2f}"
+                    f"{latest_plays.sum():,}",
+                    f"{latest_plays.mean():.2f}",
+                    f"{latest_plays.median():.0f}",
+                    f"{latest_plays.max():.0f}",
+                    f"{latest_plays.min():.0f}",
+                    f"{latest_plays.std():.2f}"
                 ]
             }
             st.dataframe(pd.DataFrame(stats_data), use_container_width=True, hide_index=True)
         
         # Active periods
         st.subheader("🔥 Most Active Listening Periods")
-        library_stats = get_library_stats_by_date(activity, metadata)
+        library_stats = get_library_stats_by_date(activity, metadata, use_differentials=True)
         top_periods = library_stats.nlargest(10, 'total_plays')[
             ['library_date', 'total_plays', 'n_songs_played']
         ].copy()
-        top_periods.columns = ['Date', 'Total Plays', 'Unique Songs']
+        top_periods.columns = ['Date', 'Total Plays Added', 'Unique Songs']
         st.dataframe(top_periods, use_container_width=True, hide_index=True)
     
     
@@ -326,8 +355,9 @@ try:
                 artist_activity = activity.merge(
                     artist_songs[['persistent_id']], on='persistent_id'
                 ).groupby('persistent_id').agg({
-                    'play_count': 'sum',
-                    'skip_count': 'sum'
+                    ## These functions need to change if I want to slide by date
+                    'play_count': 'max',
+                    'skip_count': 'max'
                 }).reset_index()
                 
                 song_stats = artist_songs.merge(
